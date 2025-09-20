@@ -24,10 +24,10 @@ TARGET_FILE="${HOME}/.juju-fzf-unified.bash"
 # ────────────── Check Dependencies ──────────────
 
 command -v juju >/dev/null 2>&1 || { echo "❌ juju CLI not found. Please install Juju first."; exit 1; }
-command -v fzf >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: https://github.com/junegunn/fzf"; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: sudo apt-get update; sudo apt-get install -y jq;"; exit 1; }
+command -v fzf >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: https://github.com/junegunn/fzf  "; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "❌ jq not found. Install it: sudo apt-get update; sudo apt-get install -y jq;"; exit 1; }
 
-# ────────────── Define Unified "j" Function ──────────────
+# ────────────── Define Unified "jzf" Function + Completion ──────────────
 
 cat > "$TARGET_FILE" << 'EOF'
 # Unified Juju FZF Gateway (installed by install-juju-fzf-unified.sh)
@@ -80,7 +80,7 @@ jzf() {
             shift
             local unit
             unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
-                    fzf --prompt='🪄 Model > ' \
+                    fzf --prompt='🪄 Unit > ' \
                         --pointer='👉' \
                         --height 40% \
                         --cycle \
@@ -142,6 +142,78 @@ jzf() {
             ;;
     esac
 }
+
+# ────────────── Bash Completion for jzf (self-contained, no juju comp needed) ──────────────
+
+_jzf_completion() {
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # Known jzf subcommands
+    local commands="controllers models ssh debug-log destroy-model"
+
+    # If we're at first argument, complete subcommands
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+        return 0
+    fi
+
+    # For known subcommands, if user types second arg, we can optionally complete:
+    #   - For ssh/debug-log → unit names
+    #   - For destroy-model → model names
+    #   - Otherwise, no completion (since juju doesn't provide it)
+
+    case "${COMP_WORDS[1]}" in
+        ssh|debug-log)
+            if [[ $COMP_CWORD -ge 2 ]]; then
+                # Try to get unit names from current model
+                local units
+                units=$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null | grep -v '^$')
+                if [[ -n "$units" ]]; then
+                    COMPREPLY=( $(compgen -W "$units" -- "$cur") )
+                fi
+            fi
+            ;;
+        destroy-model)
+            if [[ $COMP_CWORD -ge 2 ]]; then
+                # Try to get model names
+                local models
+                models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null | grep -v '^$')
+                if [[ -n "$models" ]]; then
+                    COMPREPLY=( $(compgen -W "$models" -- "$cur") )
+                fi
+            fi
+            ;;
+        models)
+            if [[ $COMP_CWORD -ge 2 ]]; then
+                # Try to get model names
+                local models
+                models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null | grep -v '^$')
+                if [[ -n "$models" ]]; then
+                    COMPREPLY=( $(compgen -W "$models" -- "$cur") )
+                fi
+            fi
+            ;;
+        controllers)
+            if [[ $COMP_CWORD -ge 2 ]]; then
+                # Try to get model names
+                local controllers
+                controllers=$(juju controllers --format=json 2>/dev/null | jq -r '.controllers | keys[]' 2>/dev/null | grep -v '^$')
+                if [[ -n "$controllers" ]]; then
+                    COMPREPLY=( $(compgen -W "$controllers" -- "$cur") )
+                fi
+            fi
+            ;;
+        *)
+            # No completion for unknown/passthrough juju commands — juju doesn't support it natively
+            ;;
+    esac
+}
+
+# Register completion for jzf
+complete -F _jzf_completion jzf
 EOF
 
 # ────────────── Inject into .bashrc ──────────────
@@ -160,7 +232,7 @@ fi
 if [[ -f "$TARGET_FILE" ]]; then
     source "$TARGET_FILE" 2>/dev/null || true
     echo ""
-    echo "🎉 Unified Juju FZF Gateway 'jzf' installed successfully!"
+    echo "🎉 Unified Juju FZF Gateway 'jzf' installed successfully with TAB COMPLETION!"
     echo ""
     echo "Usage:"
     echo "  jzf controllers     → fuzzy switch controller"

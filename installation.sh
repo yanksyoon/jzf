@@ -38,15 +38,17 @@ jzf() {
     case "$cmd" in
         controllers)
             shift
-            local controller
-            controller=$(juju controllers --format=json | jq -r '.controllers | keys[]' | \
-                    fzf --prompt='🪄 Controller > ' \
-                        --pointer='👉' \
-                        --height 40% \
-                        --cycle \
-                        --select-1 \
-                        --exit-0 \
-                        --no-multi)
+            local controller="$1"
+            if [[ -z "$controller" ]]; then
+                controller=$(juju controllers --format=json | jq -r '.controllers | keys[]' | \
+                        fzf --prompt='🪄 Controller > ' \
+                            --pointer='👉' \
+                            --height 40% \
+                            --cycle \
+                            --select-1 \
+                            --exit-0 \
+                            --no-multi)
+            fi
             if [[ -n "$controller" ]]; then
                 echo "→ juju switch $controller"
                 juju switch "$controller"
@@ -58,15 +60,17 @@ jzf() {
 
         models)
             shift
-            local model
-            model=$(juju models --format=json | jq -r '.models[].name' | \
-                    fzf --prompt='🪄 Model > ' \
-                        --pointer='👉' \
-                        --height 40% \
-                        --cycle \
-                        --select-1 \
-                        --exit-0 \
-                        --no-multi)
+            local model="$1"
+            if [[ -z "$model" ]]; then
+                model=$(juju models --format=json | jq -r '.models[].name' | \
+                        fzf --prompt='🪄 Model > ' \
+                            --pointer='👉' \
+                            --height 40% \
+                            --cycle \
+                            --select-1 \
+                            --exit-0 \
+                            --no-multi)
+            fi
             if [[ -n "$model" ]]; then
                 echo "→ juju switch $model"
                 juju switch "$model"
@@ -78,15 +82,21 @@ jzf() {
 
         ssh)
             shift
-            local unit
-            unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
-                    fzf --prompt='🪄 Unit > ' \
-                        --pointer='👉' \
-                        --height 40% \
-                        --cycle \
-                        --select-1 \
-                        --exit-0 \
-                        --no-multi)
+            local unit="$1"
+            if [[ -n "$unit" ]]; then
+                # User provided unit → skip FZF
+                shift  # consume $unit so "$@" is only extra args
+            else
+                # No unit → show FZF selector
+                unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
+                        fzf --prompt='🪄 Unit > ' \
+                            --pointer='👉' \
+                            --height 40% \
+                            --cycle \
+                            --select-1 \
+                            --exit-0 \
+                            --no-multi)
+            fi
             if [[ -n "$unit" ]]; then
                 echo "→ juju ssh $unit ${*:+[args: $*]}"
                 juju ssh "$unit" "$@"
@@ -98,37 +108,47 @@ jzf() {
 
         debug-log)
             shift
-            local unit
-            unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
-                    fzf --prompt='🪄 Unit > ' \
-                        --pointer='👉' \
-                        --height 40% \
-                        --cycle \
-                        --select-1 \
-                        --exit-0 \
-                        --no-multi)
+            local unit="$1"
             if [[ -n "$unit" ]]; then
+                shift
                 echo "→ juju debug-log -i $unit ${*:+[args: $*]}"
                 juju debug-log -i "$unit" "$@"
             else
-                echo "→ juju debug-log ${*:+[args: $*]} (no unit selected)"
-                juju debug-log "$@"
+                unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
+                        fzf --prompt='🪄 Unit > ' \
+                            --pointer='👉' \
+                            --height 40% \
+                            --cycle \
+                            --select-1 \
+                            --exit-0 \
+                            --no-multi)
+                if [[ -n "$unit" ]]; then
+                    echo "→ juju debug-log -i $unit ${*:+[args: $*]}"
+                    juju debug-log -i "$unit" "$@"
+                else
+                    echo "→ juju debug-log ${*:+[args: $*]} (no unit selected)"
+                    juju debug-log "$@"
+                fi
             fi
             ;;
 
         destroy-model)
             shift
-            local model
-            model=$(juju models --format=json | jq -r '.models[].name' | \
-                    fzf --prompt='🪄 Model > ' \
-                        --pointer='👉' \
-                        --height 40% \
-                        --cycle \
-                        --select-1 \
-                        --exit-0 \
-                        --no-multi)
+            local model="$1"
             if [[ -n "$model" ]]; then
-                echo "→ juju destroy-model $model --no-wait --force --destroy-storage --no-prompt"
+                shift  # consume $model so "$@" is only extra args
+            else
+                model=$(juju models --format=json | jq -r '.models[].name' | \
+                        fzf --prompt='🪄 Model > ' \
+                            --pointer='👉' \
+                            --height 40% \
+                            --cycle \
+                            --select-1 \
+                            --exit-0 \
+                            --no-multi)
+            fi
+            if [[ -n "$model" ]]; then
+                echo "→ juju destroy-model $model --no-wait --force --destroy-storage --no-prompt ${*:+[args: $*]}"
                 juju destroy-model "$model" --no-wait --force --destroy-storage --no-prompt "$@"
             else
                 echo "⚠️  No model selected."
@@ -143,7 +163,7 @@ jzf() {
     esac
 }
 
-# ────────────── Bash Completion for jzf (self-contained, no juju comp needed) ──────────────
+# ────────────── Bash Completion for jzf (self-contained) ──────────────
 
 _jzf_completion() {
     local cur prev
@@ -160,37 +180,21 @@ _jzf_completion() {
         return 0
     fi
 
-    # For known subcommands, if user types second arg, we can optionally complete:
-    #   - For ssh/debug-log → unit names
-    #   - For destroy-model → model names
-    #   - Otherwise, no completion (since juju doesn't provide it)
-
+    # Context-aware completion for 2nd+ arguments
     case "${COMP_WORDS[1]}" in
         ssh|debug-log)
             if [[ $COMP_CWORD -ge 2 ]]; then
-                # Try to get unit names from current model
                 local units
-                units=$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null | grep -v '^$')
+                units=$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)
                 if [[ -n "$units" ]]; then
                     COMPREPLY=( $(compgen -W "$units" -- "$cur") )
                 fi
             fi
             ;;
-        destroy-model)
+        destroy-model|models)
             if [[ $COMP_CWORD -ge 2 ]]; then
-                # Try to get model names
                 local models
-                models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null | grep -v '^$')
-                if [[ -n "$models" ]]; then
-                    COMPREPLY=( $(compgen -W "$models" -- "$cur") )
-                fi
-            fi
-            ;;
-        models)
-            if [[ $COMP_CWORD -ge 2 ]]; then
-                # Try to get model names
-                local models
-                models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null | grep -v '^$')
+                models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)
                 if [[ -n "$models" ]]; then
                     COMPREPLY=( $(compgen -W "$models" -- "$cur") )
                 fi
@@ -198,21 +202,20 @@ _jzf_completion() {
             ;;
         controllers)
             if [[ $COMP_CWORD -ge 2 ]]; then
-                # Try to get model names
                 local controllers
-                controllers=$(juju controllers --format=json 2>/dev/null | jq -r '.controllers | keys[]' 2>/dev/null | grep -v '^$')
+                controllers=$(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)
                 if [[ -n "$controllers" ]]; then
                     COMPREPLY=( $(compgen -W "$controllers" -- "$cur") )
                 fi
             fi
             ;;
         *)
-            # No completion for unknown/passthrough juju commands — juju doesn't support it natively
+            # No completion for passthrough commands
             ;;
     esac
 }
 
-# Register completion for jzf
+# Register completion
 complete -F _jzf_completion jzf
 EOF
 

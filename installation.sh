@@ -32,7 +32,7 @@ command -v jq >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: sudo apt
 cat > "$TARGET_FILE" << 'EOF'
 # Unified Juju FZF Gateway (installed by install-juju-fzf-unified.sh)
 
-j() {
+jzf() {
     local cmd="$1"
 
     case "$cmd" in
@@ -140,19 +140,19 @@ fi
 if [[ -f "$TARGET_FILE" ]]; then
     source "$TARGET_FILE" 2>/dev/null || true
     echo ""
-    echo "🎉 Unified Juju FZF Gateway 'j' installed successfully!"
+    echo "🎉 Unified Juju FZF Gateway 'jzf' installed successfully!"
     echo ""
     echo "Usage:"
-    echo "  j controllers     → fuzzy switch controller"
-    echo "  j models          → fuzzy switch model"
-    echo "  j ssh [args...]   → fuzzy SSH to unit (supports args like --proxy)"
-    echo "  j debug-log [args...]→ fuzzy print debug-log of a unit (supports args like --replay)"
-    echo "  j <anything else> → runs 'juju <anything else>' directly"
+    echo "  jzf controllers     → fuzzy switch controller"
+    echo "  jzf models          → fuzzy switch model"
+    echo "  jzf ssh [args...]   → fuzzy SSH to unit (supports args like --proxy)"
+    echo "  jzf debug-log [args...]→ fuzzy print debug-log of a unit (supports args like --replay)"
+    echo "  jzf <anything else> → runs 'juju <anything else>' directly"
     echo ""
     echo "Example:"
-    echo "  j status"
-    echo "  j deploy nginx"
-    echo "  j ssh --proxy"
+    echo "  jzf status"
+    echo "  jzf deploy nginx"
+    echo "  jzf ssh --proxy"
     echo ""
     echo "To activate now: source ~/.bashrc"
     echo "Or restart your terminal."

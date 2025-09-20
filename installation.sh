@@ -116,11 +116,6 @@ jzf() {
             fi
             ;;
 
-        *)
-            # Passthrough: delegate everything to original juju
-            juju "$@"
-            ;;
-
         destroy-model)
             shift
             local model
@@ -134,7 +129,7 @@ jzf() {
                         --no-multi)
             if [[ -n "$model" ]]; then
                 echo "→ juju destroy-model $model --no-wait --force --destroy-storage --no-prompt"
-                juju destroy-model $model --no-wait --force --destroy-storage --no-prompt "$@"
+                juju destroy-model "$model" --no-wait --force --destroy-storage --no-prompt "$@"
             else
                 echo "⚠️  No model selected."
                 return 1
@@ -172,6 +167,7 @@ if [[ -f "$TARGET_FILE" ]]; then
     echo "  jzf models          → fuzzy switch model"
     echo "  jzf ssh [args...]   → fuzzy SSH to unit (supports args like --proxy)"
     echo "  jzf debug-log [args...]→ fuzzy print debug-log of a unit (supports args like --replay)"
+    echo "  jzf destroy-model [args...]→ fuzzy destroy model"
     echo "  jzf <anything else> → runs 'juju <anything else>' directly"
     echo ""
     echo "Example:"

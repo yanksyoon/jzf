@@ -35,7 +35,18 @@ cat > "$TARGET_FILE" << 'EOF'
 jzf() {
     local cmd="$1"
 
+    # If no args, show help
+    if [[ $# -eq 0 ]]; then
+        _jzf_show_help
+        return 0
+    fi
+
     case "$cmd" in
+        help|--help|-h)
+            _jzf_show_help
+            return 0
+            ;;
+
         controllers)
             shift
             local controller="$1"
@@ -163,6 +174,49 @@ jzf() {
     esac
 }
 
+# ────────────── HELP FUNCTION ──────────────
+
+_jzf_show_help() {
+    cat << 'HELP'
+🚀 Unified Juju FZF Gateway — "jzf"
+
+Smart fuzzy-selector wrapper for Juju CLI with TAB completion.
+
+USAGE:
+    jzf [COMMAND] [ARGS...]
+
+COMMANDS:
+    help, -h, --help           → Show this help
+    controllers                → Fuzzy switch Juju controller
+    models                     → Fuzzy switch Juju model
+    ssh [UNIT] [juju-args...]  → SSH to unit (fuzzy select if no unit given)
+    debug-log [UNIT] [...]     → Show debug-log for unit (fuzzy if no unit)
+    destroy-model [MODEL] [...]→ Destroy model (fuzzy if no model given)
+    <anything else>            → Passthrough to "juju <anything else>"
+
+TAB COMPLETION (Bash/Zsh):
+    jzf <TAB>                  → Complete subcommands
+    jzf ssh <TAB>              → Complete unit names
+    jzf destroy-model <TAB>    → Complete model names
+
+EXAMPLES:
+    jzf controllers            → fuzzy-select and switch controller
+    jzf models                 → fuzzy-select and switch model
+    jzf ssh                    → fuzzy-select unit, then SSH
+    jzf ssh ubuntu/0 --proxy   → SSH directly with args
+    jzf status                 → runs "juju status"
+    jzf deploy nginx           → runs "juju deploy nginx"
+    jzf destroy-model dev      → destroys model "dev" (no FZF)
+
+💡 PRO TIPS:
+    → Add alias:   echo 'alias j=jzf' >> ~/.bashrc
+    → Then use:    j ssh ubuntu/0
+
+👉 Restart shell or run: source ~/.bashrc (or ~/.zshrc)
+
+HELP
+}
+
 # ────────────── Bash Completion for jzf (self-contained) ──────────────
 
 _jzf_completion() {
@@ -172,7 +226,7 @@ _jzf_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Known jzf subcommands
-    local commands="config controllers models show-unit ssh debug-log destroy-model"
+    local commands="config controllers models show-unit ssh debug-log destroy-model help"
 
     # If we're at first argument, complete subcommands
     if [[ $COMP_CWORD -eq 1 ]]; then
@@ -254,6 +308,7 @@ if [[ -f "$TARGET_FILE" ]]; then
     echo "  jzf ssh [args...]   → fuzzy SSH to unit (supports args like --proxy)"
     echo "  jzf debug-log [args...]→ fuzzy print debug-log of a unit (supports args like --replay)"
     echo "  jzf destroy-model [args...]→ fuzzy destroy model"
+    echo "  jzf help            → shows jzf help"
     echo "  jzf <anything else> → runs 'juju <anything else>' directly"
     echo ""
     echo "Example:"

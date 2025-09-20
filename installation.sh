@@ -172,7 +172,7 @@ _jzf_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Known jzf subcommands
-    local commands="controllers models ssh debug-log destroy-model"
+    local commands="controllers models show-unit ssh debug-log destroy-model"
 
     # If we're at first argument, complete subcommands
     if [[ $COMP_CWORD -eq 1 ]]; then
@@ -182,7 +182,7 @@ _jzf_completion() {
 
     # Context-aware completion for 2nd+ arguments
     case "${COMP_WORDS[1]}" in
-        ssh|debug-log)
+        show-unit|ssh|debug-log)
             if [[ $COMP_CWORD -ge 2 ]]; then
                 local units
                 units=$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)

@@ -32,3 +32,8 @@ Example:
   jzf deploy nginx
   jzf ssh --proxy
 ```
+
+## Demo
+
+![Demo](./files/demo.gif)
+

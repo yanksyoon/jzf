@@ -35,5 +35,9 @@ Example:
 
 ## Demo
 
+### DEMO
 ![Demo](./files/demo.gif)
+
+### SPEED
+![Speed](./files/speed.gif)
 

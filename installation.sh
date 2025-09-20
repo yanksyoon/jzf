@@ -120,6 +120,31 @@ jzf() {
             # Passthrough: delegate everything to original juju
             juju "$@"
             ;;
+
+        destroy-model)
+            shift
+            local model
+            model=$(juju models --format=json | jq -r '.models[].name' | \
+                    fzf --prompt='🪄 Model > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+            if [[ -n "$model" ]]; then
+                echo "→ juju destroy-model $model --no-wait --force --destroy-storage --no-prompt"
+                juju destroy-model $model --no-wait --force --destroy-storage --no-prompt "$@"
+            else
+                echo "⚠️  No model selected."
+                return 1
+            fi
+            ;;
+
+        *)
+            # Passthrough: delegate everything to original juju
+            juju "$@"
+            ;;
     esac
 }
 EOF

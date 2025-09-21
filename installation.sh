@@ -3,6 +3,7 @@
 # ┌─────────────────────────────────────────────────────────────────────┐
 # │                                                                     │
 # │  Install Unified Juju FZF Gateway: "j"                              │
+# │  Works on: Bash, Zsh, Fish                                          │
 # │                                                                     │
 # │  Usage:                                                             │
 # │    j controllers    → fuzzy switch controller                       │
@@ -13,37 +14,50 @@
 # │  Requirements:                                                      │
 # │    - juju CLI installed and configured                              │
 # │    - fzf installed                                                  │
+# │    - jq installed                                                   │
 # │                                                                     │
 # └─────────────────────────────────────────────────────────────────────┘
 
 set -euo pipefail
 
-BASH_CONFIG="${HOME}/.bashrc"
-TARGET_FILE="${HOME}/.juju-fzf-unified.bash"
+# Detect current shell
+CURRENT_SHELL="$(basename "$SHELL")"
+
+case "$CURRENT_SHELL" in
+    bash)   CONFIG_FILE="${HOME}/.bashrc" ;;
+    zsh)    CONFIG_FILE="${HOME}/.zshrc" ;;
+    fish)   CONFIG_FILE="${HOME}/.config/fish/config.fish" ;;
+    *)      echo "❌ Unsupported shell: $CURRENT_SHELL"; exit 1 ;;
+esac
+
+TARGET_FILE_BASH_ZSH="${HOME}/.juju-fzf-unified.bash"
+TARGET_FILE_FISH="${HOME}/.config/fish/functions/j.fish"
 
 # ────────────── Check Dependencies ──────────────
 
 command -v juju >/dev/null 2>&1 || { echo "❌ juju CLI not found. Please install Juju first."; exit 1; }
-command -v fzf >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: https://github.com/junegunn/fzf  "; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "❌ jq not found. Install it: sudo apt-get update; sudo apt-get install -y jq;"; exit 1; }
+command -v fzf >/dev/null 2>&1 || { echo "❌ fzf not found. Install it: https://github.com/junegunn/fzf"; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "❌ jq not found. Install it: sudo apt-get update && sudo apt-get install -y jq"; exit 1; }
 
-# ────────────── Define Unified "jzf" Function + Completion ──────────────
+# ────────────── Define Unified "j" Function (Bash/Zsh) ──────────────
 
-cat > "$TARGET_FILE" << 'EOF'
-# Unified Juju FZF Gateway (installed by install-juju-fzf-unified.sh)
+mkdir -p "$(dirname "$TARGET_FILE_BASH_ZSH")"
 
-jzf() {
+cat > "$TARGET_FILE_BASH_ZSH" << 'EOF'
+# Unified Juju FZF Gateway (installed by installer)
+
+j() {
     local cmd="$1"
 
     # If no args, show help
     if [[ $# -eq 0 ]]; then
-        _jzf_show_help
+        _j_show_help
         return 0
     fi
 
     case "$cmd" in
         help|--help|-h)
-            _jzf_show_help
+            _j_show_help
             return 0
             ;;
 
@@ -95,10 +109,8 @@ jzf() {
             shift
             local unit="$1"
             if [[ -n "$unit" ]]; then
-                # User provided unit → skip FZF
-                shift  # consume $unit so "$@" is only extra args
+                shift
             else
-                # No unit → show FZF selector
                 unit=$(juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
                         fzf --prompt='🪄 Unit > ' \
                             --pointer='👉' \
@@ -147,7 +159,7 @@ jzf() {
             shift
             local model="$1"
             if [[ -n "$model" ]]; then
-                shift  # consume $model so "$@" is only extra args
+                shift
             else
                 model=$(juju models --format=json | jq -r '.models[].name' | \
                         fzf --prompt='🪄 Model > ' \
@@ -168,7 +180,6 @@ jzf() {
             ;;
 
         *)
-            # Passthrough: delegate everything to original juju
             juju "$@"
             ;;
     esac
@@ -176,14 +187,14 @@ jzf() {
 
 # ────────────── HELP FUNCTION ──────────────
 
-_jzf_show_help() {
+_j_show_help() {
     cat << 'HELP'
-🚀 Unified Juju FZF Gateway — "jzf"
+🚀 Unified Juju FZF Gateway — "j"
 
 Smart fuzzy-selector wrapper for Juju CLI with TAB completion.
 
 USAGE:
-    jzf [COMMAND] [ARGS...]
+    j [COMMAND] [ARGS...]
 
 COMMANDS:
     help, -h, --help           → Show this help
@@ -194,131 +205,353 @@ COMMANDS:
     destroy-model [MODEL] [...]→ Destroy model (fuzzy if no model given)
     <anything else>            → Passthrough to "juju <anything else>"
 
-TAB COMPLETION (Bash/Zsh):
-    jzf <TAB>                  → Complete subcommands
-    jzf ssh <TAB>              → Complete unit names
-    jzf destroy-model <TAB>    → Complete model names
+TAB COMPLETION:
+    j <TAB>                    → Complete subcommands
+    j ssh <TAB>                → Complete unit names
+    j destroy-model <TAB>      → Complete model names
 
 EXAMPLES:
-    jzf controllers            → fuzzy-select and switch controller
-    jzf models                 → fuzzy-select and switch model
-    jzf ssh                    → fuzzy-select unit, then SSH
-    jzf ssh ubuntu/0 --proxy   → SSH directly with args
-    jzf status                 → runs "juju status"
-    jzf deploy nginx           → runs "juju deploy nginx"
-    jzf destroy-model dev      → destroys model "dev" (no FZF)
+    j controllers              → fuzzy-select and switch controller
+    j models                   → fuzzy-select and switch model
+    j ssh                      → fuzzy-select unit, then SSH
+    j ssh ubuntu/0 --proxy     → SSH directly with args
+    j status                   → runs "juju status"
+    j deploy nginx             → runs "juju deploy nginx"
+    j destroy-model dev        → destroys model "dev" (no FZF)
 
 💡 PRO TIPS:
-    → Add alias:   echo 'alias j=jzf' >> ~/.bashrc
-    → Then use:    j ssh ubuntu/0
-
-👉 Restart shell or run: source ~/.bashrc (or ~/.zshrc)
+    → Already aliased as "j" (no need to alias)
+    → Restart shell or run: source ~/.bashrc (or ~/.zshrc)
 
 HELP
 }
 
-# ────────────── Bash Completion for jzf (self-contained) ──────────────
+EOF
 
-_jzf_completion() {
+# ────────────── Bash/Zsh Completion ──────────────
+
+if [[ "$CURRENT_SHELL" == "bash" ]]; then
+    cat >> "$TARGET_FILE_BASH_ZSH" << 'EOF'
+
+_j_completion() {
     local cur prev
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Known jzf subcommands
     local commands="config controllers models show-unit ssh debug-log destroy-model help"
 
-    # If we're at first argument, complete subcommands
     if [[ $COMP_CWORD -eq 1 ]]; then
         COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
         return 0
     fi
 
-    # Context-aware completion for 2nd+ arguments
     case "${COMP_WORDS[1]}" in
         show-unit|ssh|debug-log)
             if [[ $COMP_CWORD -ge 2 ]]; then
                 local units
                 units=$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)
-                if [[ -n "$units" ]]; then
-                    COMPREPLY=( $(compgen -W "$units" -- "$cur") )
-                fi
+                [[ -n "$units" ]] && COMPREPLY=( $(compgen -W "$units" -- "$cur") )
             fi
             ;;
         destroy-model|models)
             if [[ $COMP_CWORD -ge 2 ]]; then
                 local models
                 models=$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)
-                if [[ -n "$models" ]]; then
-                    COMPREPLY=( $(compgen -W "$models" -- "$cur") )
-                fi
+                [[ -n "$models" ]] && COMPREPLY=( $(compgen -W "$models" -- "$cur") )
             fi
             ;;
         config)
             if [[ $COMP_CWORD -ge 2 ]]; then
                 local applications
                 applications=$(juju status --format=json | jq -r '.applications | keys[]' 2>/dev/null)
-                if [[ -n "$applications" ]]; then
-                    COMPREPLY=( $(compgen -W "$applications" -- "$cur") )
-                fi
+                [[ -n "$applications" ]] && COMPREPLY=( $(compgen -W "$applications" -- "$cur") )
             fi
             ;;
         controllers)
             if [[ $COMP_CWORD -ge 2 ]]; then
                 local controllers
                 controllers=$(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)
-                if [[ -n "$controllers" ]]; then
-                    COMPREPLY=( $(compgen -W "$controllers" -- "$cur") )
-                fi
+                [[ -n "$controllers" ]] && COMPREPLY=( $(compgen -W "$controllers" -- "$cur") )
             fi
-            ;;
-        *)
-            # No completion for passthrough commands
             ;;
     esac
 }
 
-# Register completion
-complete -F _jzf_completion jzf
+complete -F _j_completion j
+
 EOF
 
-# ────────────── Inject into .bashrc ──────────────
+elif [[ "$CURRENT_SHELL" == "zsh" ]]; then
+    cat >> "$TARGET_FILE_BASH_ZSH" << 'EOF'
 
-if ! grep -q ".juju-fzf-unified.bash" "$BASH_CONFIG" 2>/dev/null; then
-    echo "" >> "$BASH_CONFIG"
-    echo "# Unified Juju FZF Gateway" >> "$BASH_CONFIG"
-    echo "source \"$TARGET_FILE\"" >> "$BASH_CONFIG"
-    echo "✅ Added source line to $BASH_CONFIG"
+autoload -Uz compinit && compinit
+
+_j_zsh_completion() {
+    local -a cmds
+    cmds=(
+        'controllers:fuzzy switch controller'
+        'models:fuzzy switch model'
+        'ssh:fuzzy SSH to unit'
+        'debug-log:fuzzy debug-log for unit'
+        'destroy-model:fuzzy destroy model'
+        'help:show help'
+        '*:passthrough to juju'
+    )
+
+    if (( CURRENT == 2 )); then
+        _describe 'command' cmds
+        return
+    fi
+
+    case $words[2] in
+        ssh|debug-log|show-unit)
+            local -a units
+            units=(${(f)"$(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)"})
+            _describe 'unit' units
+            ;;
+        models|destroy-model)
+            local -a models
+            models=(${(f)"$(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)"})
+            _describe 'model' models
+            ;;
+        controllers)
+            local -a controllers
+            controllers=(${(f)"$(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)"})
+            _describe 'controller' controllers
+            ;;
+        config)
+            local -a apps
+            apps=(${(f)"$(juju status --format=json 2>/dev/null | jq -r '.applications | keys[]' 2>/dev/null)"})
+            _describe 'application' apps
+            ;;
+    esac
+}
+
+compdef _j_zsh_completion j
+
+EOF
+
+fi
+
+# ────────────── Fish Function & Completion ──────────────
+
+if [[ "$CURRENT_SHELL" == "fish" ]]; then
+    mkdir -p "$(dirname "$TARGET_FILE_FISH")"
+
+    cat > "$TARGET_FILE_FISH" << 'EOF'
+function j
+    set cmd $argv[1]
+
+    if test (count $argv) -eq 0
+        _j_show_help
+        return 0
+    end
+
+    switch $cmd
+        case help --help -h
+            _j_show_help
+            return 0
+
+        case controllers
+            set -e argv[1]
+            set controller $argv[1]
+            if test -z "$controller"
+                set controller (juju controllers --format=json | jq -r '.controllers | keys[]' | \
+                    fzf --prompt='🪄 Controller > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+            end
+            if test -n "$controller"
+                echo "→ juju switch $controller"
+                juju switch "$controller"
+            else
+                echo "⚠️  No controller selected."
+                return 1
+            end
+
+        case models
+            set -e argv[1]
+            set model $argv[1]
+            if test -z "$model"
+                set model (juju models --format=json | jq -r '.models[].name' | \
+                    fzf --prompt='🪄 Model > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+            end
+            if test -n "$model"
+                echo "→ juju switch $model"
+                juju switch "$model"
+            else
+                echo "⚠️  No model selected."
+                return 1
+            end
+
+        case ssh
+            set -e argv[1]
+            set unit $argv[1]
+            if test -n "$unit"
+                set -e argv[1]
+            else
+                set unit (juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
+                    fzf --prompt='🪄 Unit > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+            end
+            if test -n "$unit"
+                echo "→ juju ssh $unit"(test -n "$argv" && echo " [args: $argv]")
+                juju ssh "$unit" $argv
+            else
+                echo "⚠️  No unit selected."
+                return 1
+            end
+
+        case debug-log
+            set -e argv[1]
+            set unit $argv[1]
+            if test -n "$unit"
+                set -e argv[1]
+                echo "→ juju debug-log -i $unit"(test -n "$argv" && echo " [args: $argv]")
+                juju debug-log -i "$unit" $argv
+            else
+                set unit (juju status --format=json | jq -r '.applications[] | .units | keys[]' | \
+                    fzf --prompt='🪄 Unit > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+                if test -n "$unit"
+                    echo "→ juju debug-log -i $unit"(test -n "$argv" && echo " [args: $argv]")
+                    juju debug-log -i "$unit" $argv
+                else
+                    echo "→ juju debug-log"(test -n "$argv" && echo " [args: $argv]")" (no unit selected)"
+                    juju debug-log $argv
+                end
+            end
+
+        case destroy-model
+            set -e argv[1]
+            set model $argv[1]
+            if test -z "$model"
+                set model (juju models --format=json | jq -r '.models[].name' | \
+                    fzf --prompt='🪄 Model > ' \
+                        --pointer='👉' \
+                        --height 40% \
+                        --cycle \
+                        --select-1 \
+                        --exit-0 \
+                        --no-multi)
+            end
+            if test -n "$model"
+                echo "→ juju destroy-model $model --no-wait --force --destroy-storage --no-prompt"(test -n "$argv" && echo " [args: $argv]")
+                juju destroy-model "$model" --no-wait --force --destroy-storage --no-prompt $argv
+            else
+                echo "⚠️  No model selected."
+                return 1
+            end
+
+        case '*'
+            juju $argv
+    end
+end
+
+function _j_show_help
+    cat << HELP
+🚀 Unified Juju FZF Gateway — "j"
+
+Smart fuzzy-selector wrapper for Juju CLI with TAB completion.
+
+USAGE:
+    j [COMMAND] [ARGS...]
+
+COMMANDS:
+    help, -h, --help           → Show this help
+    controllers                → Fuzzy switch Juju controller
+    models                     → Fuzzy switch Juju model
+    ssh [UNIT] [juju-args...]  → SSH to unit (fuzzy select if no unit given)
+    debug-log [UNIT] [...]     → Show debug-log for unit (fuzzy if no unit)
+    destroy-model [MODEL] [...]→ Destroy model (fuzzy if no model given)
+    <anything else>            → Passthrough to "juju <anything else>"
+
+TAB COMPLETION:
+    j <TAB>                    → Complete subcommands
+    j ssh <TAB>                → Complete unit names
+    j destroy-model <TAB>      → Complete model names
+
+EXAMPLES:
+    j controllers              → fuzzy-select and switch controller
+    j models                   → fuzzy-select and switch model
+    j ssh                      → fuzzy-select unit, then SSH
+    j ssh ubuntu/0 --proxy     → SSH directly with args
+    j status                   → runs "juju status"
+    j deploy nginx             → runs "juju deploy nginx"
+    j destroy-model dev        → destroys model "dev" (no FZF)
+
+💡 PRO TIPS:
+    → Already named "j" — no alias needed
+    → Restart fish or run: source ~/.config/fish/config.fish
+
+HELP
+end
+
+# Fish completions
+complete -c j -n "__fish_seen_subcommand_from ''" -a "help controllers models ssh debug-log destroy-model" -d "Juju FZF Gateway Commands"
+complete -c j -n "__fish_seen_subcommand_from ssh debug-log show-unit" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)"
+complete -c j -n "__fish_seen_subcommand_from models destroy-model" -f -a "(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)"
+complete -c j -n "__fish_seen_subcommand_from controllers" -f -a "(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)"
+complete -c j -n "__fish_seen_subcommand_from config" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications | keys[]' 2>/dev/null)"
+
+EOF
+
+fi
+
+# ────────────── Inject into Shell Config ──────────────
+
+if [[ "$CURRENT_SHELL" == "fish" ]]; then
+    # Fish auto-loads functions from ~/.config/fish/functions/
+    # No need to source, but notify user
+    echo "✅ Fish function 'j' installed to $TARGET_FILE_FISH"
 else
-    echo "ℹ️  Source line already exists in $BASH_CONFIG"
+    # Bash/Zsh: source the file in config
+    if ! grep -q ".juju-fzf-unified.bash" "$CONFIG_FILE" 2>/dev/null; then
+        echo "" >> "$CONFIG_FILE"
+        echo "# Unified Juju FZF Gateway" >> "$CONFIG_FILE"
+        echo "source \"$TARGET_FILE_BASH_ZSH\"" >> "$CONFIG_FILE"
+        echo "✅ Added source line to $CONFIG_FILE"
+    else
+        echo "ℹ️  Source line already exists in $CONFIG_FILE"
+    fi
 fi
 
 # ────────────── Source and Notify ──────────────
 
-if [[ -f "$TARGET_FILE" ]]; then
-    source "$TARGET_FILE" 2>/dev/null || true
-    echo ""
-    echo "🎉 Unified Juju FZF Gateway 'jzf' installed successfully with TAB COMPLETION!"
-    echo ""
-    echo "Usage:"
-    echo "  jzf config          → fuzzy show applications config"
-    echo "  jzf controllers     → fuzzy switch controller"
-    echo "  jzf models          → fuzzy switch model"
-    echo "  jzf show-unit       → fuzzy show unit"
-    echo "  jzf ssh [args...]   → fuzzy SSH to unit (supports args like --proxy)"
-    echo "  jzf debug-log [args...]→ fuzzy print debug-log of a unit (supports args like --replay)"
-    echo "  jzf destroy-model [args...]→ fuzzy destroy model"
-    echo "  jzf help            → shows jzf help"
-    echo "  jzf <anything else> → runs 'juju <anything else>' directly"
-    echo ""
-    echo "Example:"
-    echo "  jzf status"
-    echo "  jzf deploy nginx"
-    echo "  jzf ssh --proxy"
-    echo ""
-    echo "To activate now: source ~/.bashrc"
-    echo "Or restart your terminal."
+echo ""
+echo "🎉 Unified Juju FZF Gateway 'j' installed successfully for $CURRENT_SHELL with TAB COMPLETION!"
+echo ""
+
+if [[ "$CURRENT_SHELL" == "fish" ]]; then
+    echo "→ Restart fish or run: source ~/.config/fish/config.fish"
 else
-    echo "❌ Installation failed: target file not created."
-    exit 1
+    echo "→ Restart shell or run: source $CONFIG_FILE"
 fi
+
+echo ""
+echo "Try it:"
+echo "  j controllers"
+echo "  j models"
+echo "  j ssh"
+echo "  j status"

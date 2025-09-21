@@ -2,14 +2,14 @@
 
 # ┌─────────────────────────────────────────────────────────────────────┐
 # │                                                                     │
-# │  Install Unified Juju FZF Gateway: "j"                              │
+# │  Install Unified Juju FZF Gateway: "jzf"                              │
 # │  Works on: Bash, Zsh, Fish                                          │
 # │                                                                     │
 # │  Usage:                                                             │
-# │    j controllers    → fuzzy switch controller                       │
-# │    j models         → fuzzy switch model                            │
-# │    j ssh [args...]  → fuzzy select unit, then juju ssh [args]       │
-# │    j <anything else> → passthrough to juju <anything else>          │
+# │    jzf controllers    → fuzzy switch controller                       │
+# │    jzf models         → fuzzy switch model                            │
+# │    jzf ssh [args...]  → fuzzy select unit, then juju ssh [args]       │
+# │    jzf <anything else> → passthrough to juju <anything else>          │
 # │                                                                     │
 # │  Requirements:                                                      │
 # │    - juju CLI installed and configured                              │
@@ -46,7 +46,7 @@ mkdir -p "$(dirname "$TARGET_FILE_BASH_ZSH")"
 cat > "$TARGET_FILE_BASH_ZSH" << 'EOF'
 # Unified Juju FZF Gateway (installed by installer)
 
-j() {
+jzf() {
     local cmd="$1"
 
     # If no args, show help
@@ -194,7 +194,7 @@ _j_show_help() {
 Smart fuzzy-selector wrapper for Juju CLI with TAB completion.
 
 USAGE:
-    j [COMMAND] [ARGS...]
+    jzf [COMMAND] [ARGS...]
 
 COMMANDS:
     help, -h, --help           → Show this help
@@ -206,21 +206,21 @@ COMMANDS:
     <anything else>            → Passthrough to "juju <anything else>"
 
 TAB COMPLETION:
-    j <TAB>                    → Complete subcommands
-    j ssh <TAB>                → Complete unit names
-    j destroy-model <TAB>      → Complete model names
+    jzf <TAB>                    → Complete subcommands
+    jzf ssh <TAB>                → Complete unit names
+    jzf destroy-model <TAB>      → Complete model names
 
 EXAMPLES:
-    j controllers              → fuzzy-select and switch controller
-    j models                   → fuzzy-select and switch model
-    j ssh                      → fuzzy-select unit, then SSH
-    j ssh ubuntu/0 --proxy     → SSH directly with args
-    j status                   → runs "juju status"
-    j deploy nginx             → runs "juju deploy nginx"
-    j destroy-model dev        → destroys model "dev" (no FZF)
+    jzf controllers              → fuzzy-select and switch controller
+    jzf models                   → fuzzy-select and switch model
+    jzf ssh                      → fuzzy-select unit, then SSH
+    jzf ssh ubuntu/0 --proxy     → SSH directly with args
+    jzf status                   → runs "juju status"
+    jzf deploy nginx             → runs "juju deploy nginx"
+    jzf destroy-model dev        → destroys model "dev" (no FZF)
 
 💡 PRO TIPS:
-    → Already aliased as "j" (no need to alias)
+    → Add alias:   echo 'alias j=jzf' >> ~/.bashrc
     → Restart shell or run: source ~/.bashrc (or ~/.zshrc)
 
 HELP
@@ -340,7 +340,7 @@ if [[ "$CURRENT_SHELL" == "fish" ]]; then
     mkdir -p "$(dirname "$TARGET_FILE_FISH")"
 
     cat > "$TARGET_FILE_FISH" << 'EOF'
-function j
+function jzf
     set cmd $argv[1]
 
     if test (count $argv) -eq 0
@@ -476,7 +476,7 @@ function _j_show_help
 Smart fuzzy-selector wrapper for Juju CLI with TAB completion.
 
 USAGE:
-    j [COMMAND] [ARGS...]
+    jzf [COMMAND] [ARGS...]
 
 COMMANDS:
     help, -h, --help           → Show this help
@@ -488,32 +488,32 @@ COMMANDS:
     <anything else>            → Passthrough to "juju <anything else>"
 
 TAB COMPLETION:
-    j <TAB>                    → Complete subcommands
-    j ssh <TAB>                → Complete unit names
-    j destroy-model <TAB>      → Complete model names
+    jzf <TAB>                    → Complete subcommands
+    jzf ssh <TAB>                → Complete unit names
+    jzf destroy-model <TAB>      → Complete model names
 
 EXAMPLES:
-    j controllers              → fuzzy-select and switch controller
-    j models                   → fuzzy-select and switch model
-    j ssh                      → fuzzy-select unit, then SSH
-    j ssh ubuntu/0 --proxy     → SSH directly with args
-    j status                   → runs "juju status"
-    j deploy nginx             → runs "juju deploy nginx"
-    j destroy-model dev        → destroys model "dev" (no FZF)
+    jzf controllers              → fuzzy-select and switch controller
+    jzf models                   → fuzzy-select and switch model
+    jzf ssh                      → fuzzy-select unit, then SSH
+    jzf ssh ubuntu/0 --proxy     → SSH directly with args
+    jzf status                   → runs "juju status"
+    jzf deploy nginx             → runs "juju deploy nginx"
+    jzf destroy-model dev        → destroys model "dev" (no FZF)
 
 💡 PRO TIPS:
-    → Already named "j" — no alias needed
+    → Add alias:   echo 'alias j=jzf'
     → Restart fish or run: source ~/.config/fish/config.fish
 
 HELP
 end
 
 # Fish completions
-complete -c j -n "__fish_seen_subcommand_from ''" -a "help controllers models ssh debug-log destroy-model" -d "Juju FZF Gateway Commands"
-complete -c j -n "__fish_seen_subcommand_from ssh debug-log show-unit" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)"
-complete -c j -n "__fish_seen_subcommand_from models destroy-model" -f -a "(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)"
-complete -c j -n "__fish_seen_subcommand_from controllers" -f -a "(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)"
-complete -c j -n "__fish_seen_subcommand_from config" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications | keys[]' 2>/dev/null)"
+complete -c jzf -n "__fish_seen_subcommand_from ''" -a "help controllers models ssh debug-log destroy-model" -d "Juju FZF Gateway Commands"
+complete -c jzf -n "__fish_seen_subcommand_from ssh debug-log show-unit" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications[]?.units|keys[]?' 2>/dev/null)"
+complete -c jzf -n "__fish_seen_subcommand_from models destroy-model" -f -a "(juju models --format=json 2>/dev/null | jq -r '.models[].name' 2>/dev/null)"
+complete -c jzf -n "__fish_seen_subcommand_from controllers" -f -a "(juju controllers --format=json 2>/dev/null | jq -r '.controllers|keys[]?' 2>/dev/null)"
+complete -c jzf -n "__fish_seen_subcommand_from config" -f -a "(juju status --format=json 2>/dev/null | jq -r '.applications | keys[]' 2>/dev/null)"
 
 EOF
 
@@ -551,7 +551,7 @@ fi
 
 echo ""
 echo "Try it:"
-echo "  j controllers"
-echo "  j models"
-echo "  j ssh"
-echo "  j status"
+echo "  jzf controllers"
+echo "  jzf models"
+echo "  jzf ssh"
+echo "  jzf status"
